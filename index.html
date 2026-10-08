@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>commit</title>
+    <!-- JSZip Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --bg: #000000;
+            --fg: #ffffff;
+            --gray: #666666;
+            --border: #222222;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--fg);
+            display: flex;
+            justify-content: center;
+            padding: 8vh 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 400;
+            letter-spacing: -0.5px;
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .form-row > .form-group {
+            flex: 1;
+        }
+
+        label {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--gray);
+            margin-bottom: 8px;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="file"] {
+            width: 100%;
+            padding: 12px 16px;
+            background-color: transparent;
+            border: 1px solid var(--border);
+            color: var(--fg);
+            font-size: 14px;
+            border-radius: 0;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input::placeholder {
+            color: #444;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            border-color: var(--fg);
+        }
+
+        input[type="file"] {
+            padding: 9px 12px;
+            color: var(--gray);
+            cursor: pointer;
+        }
+
+        input[type="file"]::file-selector-button {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--fg);
+            padding: 6px 12px;
+            margin-right: 12px;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="file"]::file-selector-button:hover {
+            background: var(--fg);
+            color: var(--bg);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 32px;
+        }
+
+        .checkbox-group label {
+            margin: 0;
+            text-transform: none;
+            letter-spacing: 0;
+            font-size: 13px;
+            color: var(--gray);
+        }
+
+        input[type="checkbox"] {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border: 1px solid var(--gray);
+            border-radius: 0;
+            cursor: pointer;
+            position: relative;
+        }
+
+        input[type="checkbox"]:checked {
+            background-color: var(--fg);
+            border-color: var(--fg);
+        }
+
+        button {
+            width: 100%;
+            padding: 16px;
+            background-color: var(--fg);
+            color: var(--bg);
+            border: none;
+            border-radius: 0;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.8;
+        }
+
+        button:disabled {
+            background-color: var(--border);
+            color: var(--gray);
+            cursor: not-allowed;
+            opacity: 1;
+        }
+
+        .console {
+            margin-top: 40px;
+            border-top: 1px solid var(--border);
+            padding-top: 20px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 11px;
+            color: var(--gray);
+            height: 150px;
+            overflow-y: auto;
+        }
+
+        .log-entry { margin-bottom: 6px; line-height: 1.4; }
+        .log-time { color: #444; margin-right: 8px; }
+        .log-highlight { color: var(--fg); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>commit</h1>
+    
+    <div class="form-group">
+        <label>Personal Access Token</label>
+        <input type="password" id="pat" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+    </div>
+
+    <div class="form-group">
+        <label>Repository</label>
+        <input type="text" id="repo" placeholder="username/repository">
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Branch</label>
+            <input type="text" id="branch" placeholder="main" value="main">
+        </div>
+        <div class="form-group">
+            <label>Target Path</label>
+            <input type="text" id="targetFolder" placeholder="Leave empty for root">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>Commit Message</label>
+        <input type="text" id="commitMessage" placeholder="Update files" value="Update files">
+    </div>
+
+    <div class="form-group">
+        <label>Archive</label>
+        <input type="file" id="zipFile" accept=".zip">
+    </div>
+
+    <div class="checkbox-group">
+        <input type="checkbox" id="forcePush">
+        <label for="forcePush">Force push (overwrite history)</label>
+    </div>
+
+    <button id="deployBtn" onclick="startDeployment()">Deploy</button>
+
+    <div class="console" id="consoleOutput">
+        <div class="log-entry"><span class="log-highlight">system ready.</span> waiting for input.</div>
+    </div>
+</div>
+
+<script>
+    const logOutput = document.getElementById('consoleOutput');
+    const deployBtn = document.getElementById('deployBtn');
+
+    function log(message, isHighlight = false) {
+        const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+        const div = document.createElement('div');
+        div.className = 'log-entry';
+        
+        const contentClass = isHighlight ? 'log-highlight' : '';
+        div.innerHTML = `<span class="log-time">[${time}]</span> <span class="${contentClass}">${message}</span>`;
+        
+        logOutput.appendChild(div);
+        logOutput.scrollTop = logOutput.scrollHeight;
+    }
+
+    async function apiRequest(url, method = 'GET', body = null, token) {
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json'
+        };
+        const options = { method, headers };
+        if (body) options.body = JSON.stringify(body);
+
+        const response = await fetch(url, options);
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.message || `HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    }
+
+    async function startDeployment() {
+        const pat = document.getElementById('pat').value.trim();
+        const repo = document.getElementById('repo').value.trim();
+        const branch = document.getElementById('branch').value.trim();
+        const targetFolder = document.getElementById('targetFolder').value.trim().replace(/\/+$/, '');
+        const commitMessage = document.getElementById('commitMessage').value.trim();
+        const forcePush = document.getElementById('forcePush').checked;
+        const fileInput = document.getElementById('zipFile');
+
+        if (!pat || !repo || !branch || !fileInput.files.length) {
+            log('error: missing required fields or file.', true);
+            return;
+        }
+
+        deployBtn.disabled = true;
+        deployBtn.textContent = 'Deploying...';
+        log('initiating deployment sequence...');
+
+        try {
+            const baseUrl = `https://api.github.com/repos/${repo}`;
+            
+            // 1. Verify Repo and Branch
+            log(`verifying ${repo}@${branch}...`);
+            const refData = await apiRequest(`${baseUrl}/git/refs/heads/${branch}`, 'GET', null, pat);
+            const latestCommitSha = refData.object.sha;
+            
+            // 2. Get Base Tree
+            const commitData = await apiRequest(`${baseUrl}/git/commits/${latestCommitSha}`, 'GET', null, pat);
+            const baseTreeSha = commitData.tree.sha;
+
+            // 3. Extract ZIP and Create Blobs
+            log(`extracting ${fileInput.files[0].name}...`);
+            const zip = await JSZip.loadAsync(fileInput.files[0]);
+            const filesToUpload = Object.values(zip.files).filter(f => !f.dir);
+            
+            // 4. Detect if wrapped in a single root folder
+            let commonPrefix = "";
+            if (filesToUpload.length > 0) {
+                const firstPath = filesToUpload[0].name;
+                const firstDir = firstPath.includes('/') ? firstPath.split('/')[0] + '/' : '';
+                
+                if (firstDir && filesToUpload.every(f => f.name.startsWith(firstDir))) {
+                    commonPrefix = firstDir;
+                    log(`detected root folder wrapper '${firstDir}'. stripping path...`);
+                }
+            }
+
+            log(`processing ${filesToUpload.length} files...`);
+            const treeItems = [];
+            
+            const chunkSize = 5; 
+            for (let i = 0; i < filesToUpload.length; i += chunkSize) {
+                const chunk = filesToUpload.slice(i, i + chunkSize);
+                const promises = chunk.map(async (zipEntry) => {
+                    const base64Data = await zipEntry.async("base64");
+                    const blobData = await apiRequest(`${baseUrl}/git/blobs`, 'POST', {
+                        content: base64Data,
+                        encoding: 'base64'
+                    }, pat);
+                    
+                    // Strip the common prefix if it exists
+                    let cleanPath = zipEntry.name;
+                    if (commonPrefix && cleanPath.startsWith(commonPrefix)) {
+                        cleanPath = cleanPath.substring(commonPrefix.length);
+                    }
+                    
+                    const filePath = targetFolder 
+                        ? `${targetFolder}/${cleanPath}` 
+                        : cleanPath;
+                        
+                    return {
+                        path: filePath,
+                        mode: '100644',
+                        type: 'blob',
+                        sha: blobData.sha
+                    };
+                });
+                const results = await Promise.all(promises);
+                treeItems.push(...results);
+                log(`uploaded ${Math.min(i + chunkSize, filesToUpload.length)}/${filesToUpload.length} objects.`);
+            }
+
+         // 5. Create New Tree
+            log(`constructing git tree...`);
+            
+            const treePayload = { tree: treeItems };
+            // If NOT force pushing, merge with existing files. 
+            // If force pushing, omit base_tree to delete all old files.
+            if (!forcePush) {
+                treePayload.base_tree = baseTreeSha;
+            }
+
+            const newTreeData = await apiRequest(`${baseUrl}/git/trees`, 'POST', treePayload, pat);
+
+
+            // 6. Create New Commit
+            log(`creating commit...`);
+            const newCommitData = await apiRequest(`${baseUrl}/git/commits`, 'POST', {
+                message: commitMessage,
+                tree: newTreeData.sha,
+                parents: [latestCommitSha]
+            }, pat);
+
+            // 7. Update Reference
+            log(`updating reference (force: ${forcePush})...`);
+            await apiRequest(`${baseUrl}/git/refs/heads/${branch}`, 'PATCH', {
+                sha: newCommitData.sha,
+                force: forcePush
+            }, pat);
+
+            log(`deployment successful. commit: ${newCommitData.sha.substring(0,7)}`, true);
+
+        } catch (error) {
+            log(`fatal error: ${error.message}`, true);
+        } finally {
+            deployBtn.disabled = false;
+            deployBtn.textContent = 'Deploy';
+        }
+    }
+</script>
+</body>
+</html>
