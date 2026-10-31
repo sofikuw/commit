@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>commit</title>
+    <title>commit - GitHub Direct Uploader & Committer</title>
     <!-- JSZip Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
@@ -118,7 +118,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-bottom: 32px;
+            margin-bottom: 16px;
         }
 
         .checkbox-group label {
@@ -127,6 +127,7 @@
             letter-spacing: 0;
             font-size: 13px;
             color: var(--gray);
+            cursor: pointer;
         }
 
         input[type="checkbox"] {
@@ -157,6 +158,7 @@
             letter-spacing: 1px;
             cursor: pointer;
             transition: opacity 0.2s;
+            margin-top: 10px;
         }
 
         button:hover {
@@ -218,13 +220,18 @@
     </div>
 
     <div class="form-group">
-        <label>Archive</label>
+        <label>Archive (.zip)</label>
         <input type="file" id="zipFile" accept=".zip">
     </div>
 
     <div class="checkbox-group">
+        <input type="checkbox" id="stripRoot" checked>
+        <label for="stripRoot">Strip root directory from archive paths</label>
+    </div>
+
+    <div class="checkbox-group">
         <input type="checkbox" id="forcePush">
-        <label for="forcePush">Force push (overwrite history)</label>
+        <label for="forcePush">Force push (overwrite history / replace all files)</label>
     </div>
 
     <button id="deployBtn" onclick="startDeployment()">Deploy</button>
@@ -260,6 +267,9 @@
         if (body) options.body = JSON.stringify(body);
 
         const response = await fetch(url, options);
+        if (response.status === 204) {
+            return null;
+        }
         if (!response.ok) {
             const err = await response.json().catch(() => ({}));
             throw new Error(err.message || `HTTP ${response.status}: ${response.statusText}`);
@@ -271,13 +281,14 @@
         const pat = document.getElementById('pat').value.trim();
         const repo = document.getElementById('repo').value.trim();
         const branch = document.getElementById('branch').value.trim();
-        const targetFolder = document.getElementById('targetFolder').value.trim().replace(/\/+$/, '');
+        const targetFolder = document.getElementById('targetFolder').value.trim().replace(/^\/+/, '').replace(/\/+$/, '');
         const commitMessage = document.getElementById('commitMessage').value.trim();
+        const stripRoot = document.getElementById('stripRoot').checked;
         const forcePush = document.getElementById('forcePush').checked;
         const fileInput = document.getElementById('zipFile');
 
         if (!pat || !repo || !branch || !fileInput.files.length) {
-            log('error: missing required fields or file.', true);
+            log('error: missing required fields or archive file.', true);
             return;
         }
 
@@ -302,15 +313,15 @@
             const zip = await JSZip.loadAsync(fileInput.files[0]);
             const filesToUpload = Object.values(zip.files).filter(f => !f.dir);
             
-            // 4. Detect if wrapped in a single root folder
+            // 4. Detect root folder wrapper if enabled
             let commonPrefix = "";
-            if (filesToUpload.length > 0) {
+            if (stripRoot && filesToUpload.length > 0) {
                 const firstPath = filesToUpload[0].name;
                 const firstDir = firstPath.includes('/') ? firstPath.split('/')[0] + '/' : '';
                 
                 if (firstDir && filesToUpload.every(f => f.name.startsWith(firstDir))) {
                     commonPrefix = firstDir;
-                    log(`detected root folder wrapper '${firstDir}'. stripping path...`);
+                    log(`stripping root directory wrapper '${firstDir}'...`);
                 }
             }
 
@@ -327,12 +338,15 @@
                         encoding: 'base64'
                     }, pat);
                     
-                    // Strip the common prefix if it exists
+                    // Strip the common prefix if it exists and stripRoot is true
                     let cleanPath = zipEntry.name;
-                    if (commonPrefix && cleanPath.startsWith(commonPrefix)) {
+                    if (stripRoot && commonPrefix && cleanPath.startsWith(commonPrefix)) {
                         cleanPath = cleanPath.substring(commonPrefix.length);
                     }
                     
+                    // Skip empty paths if any
+                    if (!cleanPath) return null;
+
                     const filePath = targetFolder 
                         ? `${targetFolder}/${cleanPath}` 
                         : cleanPath;
@@ -344,28 +358,25 @@
                         sha: blobData.sha
                     };
                 });
-                const results = await Promise.all(promises);
+                const results = (await Promise.all(promises)).filter(item => item !== null);
                 treeItems.push(...results);
                 log(`uploaded ${Math.min(i + chunkSize, filesToUpload.length)}/${filesToUpload.length} objects.`);
             }
 
-         // 5. Create New Tree
+            // 5. Create New Tree
             log(`constructing git tree...`);
             
             const treePayload = { tree: treeItems };
-            // If NOT force pushing, merge with existing files. 
-            // If force pushing, omit base_tree to delete all old files.
             if (!forcePush) {
                 treePayload.base_tree = baseTreeSha;
             }
 
             const newTreeData = await apiRequest(`${baseUrl}/git/trees`, 'POST', treePayload, pat);
 
-
             // 6. Create New Commit
             log(`creating commit...`);
             const newCommitData = await apiRequest(`${baseUrl}/git/commits`, 'POST', {
-                message: commitMessage,
+                message: commitMessage || 'Update files',
                 tree: newTreeData.sha,
                 parents: [latestCommitSha]
             }, pat);
